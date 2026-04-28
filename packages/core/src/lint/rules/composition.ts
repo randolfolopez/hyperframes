@@ -1,54 +1,7 @@
 import type { LintContext, HyperframeLintFinding } from "../context";
 import { readAttr, truncateSnippet } from "../utils";
 
-const MAX_COMPOSITION_LINES = 300;
-const MAX_TIMED_ELEMENTS_PER_TRACK = 3;
-
 export const compositionRules: Array<(ctx: LintContext) => HyperframeLintFinding[]> = [
-  // composition_file_too_large
-  ({ rawSource }) => {
-    const lineCount = rawSource.split(/\r\n|\r|\n/).length;
-    if (lineCount <= MAX_COMPOSITION_LINES) return [];
-
-    return [
-      {
-        code: "composition_file_too_large",
-        severity: "warning",
-        message: `This composition file has ${lineCount} lines. Large single-file compositions are hard for agents to inspect and revise reliably.`,
-        fixHint:
-          "Split coherent scenes or layers into smaller .html files under compositions/, then mount them from the parent with data-composition-src so each piece can be validated independently.",
-      },
-    ];
-  },
-
-  // timeline_track_too_dense
-  ({ tags }) => {
-    const trackCounts = new Map<string, number>();
-
-    for (const tag of tags) {
-      if (readAttr(tag.raw, "data-composition-id")) continue;
-      const startStr = readAttr(tag.raw, "data-start");
-      const trackStr = readAttr(tag.raw, "data-track-index");
-      if (!startStr || !trackStr) continue;
-
-      trackCounts.set(trackStr, (trackCounts.get(trackStr) ?? 0) + 1);
-    }
-
-    const findings: HyperframeLintFinding[] = [];
-    for (const [track, count] of trackCounts) {
-      if (count <= MAX_TIMED_ELEMENTS_PER_TRACK) continue;
-      findings.push({
-        code: "timeline_track_too_dense",
-        severity: "warning",
-        message: `Track ${track} has ${count} timed elements in this file. Dense tracks usually mean too much scene structure is packed into one composition.`,
-        fixHint:
-          "Move coherent scene groups into separate .html files under compositions/ and mount them from the parent with data-composition-src so the timeline stays easier to inspect, revise, and validate.",
-      });
-    }
-
-    return findings;
-  },
-
   // timed_element_missing_visibility_hidden
   ({ tags }) => {
     const findings: HyperframeLintFinding[] = [];
