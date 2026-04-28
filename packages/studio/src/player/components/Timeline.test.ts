@@ -5,6 +5,7 @@ import {
   getTimelineCanvasHeight,
   resolveTimelineAssetDrop,
   getTimelinePlayheadLeft,
+  getTimelineScrollLeftForZoomAnchor,
   getTimelineScrollLeftForZoomTransition,
   shouldHandleTimelineDeleteKey,
   shouldAutoScrollTimeline,
@@ -142,6 +143,47 @@ describe("getTimelineScrollLeftForZoomTransition", () => {
     expect(getTimelineScrollLeftForZoomTransition("fit", "fit", 480)).toBe(480);
     expect(getTimelineScrollLeftForZoomTransition("fit", "manual", 480)).toBe(480);
     expect(getTimelineScrollLeftForZoomTransition("manual", "manual", 480)).toBe(480);
+  });
+});
+
+describe("getTimelineScrollLeftForZoomAnchor", () => {
+  it("preserves the time under the pointer when zooming in", () => {
+    expect(
+      getTimelineScrollLeftForZoomAnchor({
+        pointerX: 300,
+        currentScrollLeft: 200,
+        gutter: 32,
+        currentPixelsPerSecond: 10,
+        nextPixelsPerSecond: 20,
+        duration: 120,
+      }),
+    ).toBe(668);
+  });
+
+  it("clamps negative scroll targets", () => {
+    expect(
+      getTimelineScrollLeftForZoomAnchor({
+        pointerX: 300,
+        currentScrollLeft: 0,
+        gutter: 32,
+        currentPixelsPerSecond: 20,
+        nextPixelsPerSecond: 5,
+        duration: 120,
+      }),
+    ).toBe(0);
+  });
+
+  it("preserves current scroll when inputs are invalid", () => {
+    expect(
+      getTimelineScrollLeftForZoomAnchor({
+        pointerX: 300,
+        currentScrollLeft: 120,
+        gutter: 32,
+        currentPixelsPerSecond: 0,
+        nextPixelsPerSecond: 20,
+        duration: 120,
+      }),
+    ).toBe(120);
   });
 });
 

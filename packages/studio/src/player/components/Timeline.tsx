@@ -26,7 +26,7 @@ import {
   type TimelineTrackStyle,
   type TimelineTheme,
 } from "./timelineTheme";
-import { getTimelinePixelsPerSecond } from "./timelineZoom";
+import { getPinchTimelineZoomPercent, getTimelinePixelsPerSecond } from "./timelineZoom";
 import { TIMELINE_ASSET_MIME } from "../../utils/timelineAssetDrop";
 
 /* ── Layout ─────────────────────────────────────────────────────── */
@@ -130,6 +130,31 @@ export function getTimelineScrollLeftForZoomTransition(
 ): number {
   if (previousZoomMode === "manual" && nextZoomMode === "fit") return 0;
   return currentScrollLeft;
+}
+
+export function getTimelineScrollLeftForZoomAnchor(input: {
+  pointerX: number;
+  currentScrollLeft: number;
+  gutter: number;
+  currentPixelsPerSecond: number;
+  nextPixelsPerSecond: number;
+  duration: number;
+}): number {
+  const currentPps = Math.max(0, input.currentPixelsPerSecond);
+  const nextPps = Math.max(0, input.nextPixelsPerSecond);
+  if (
+    !Number.isFinite(input.pointerX) ||
+    !Number.isFinite(input.currentScrollLeft) ||
+    !Number.isFinite(input.duration) ||
+    input.duration <= 0 ||
+    currentPps <= 0 ||
+    nextPps <= 0
+  ) {
+    return Math.max(0, input.currentScrollLeft);
+  }
+  const timelineX = Math.max(0, input.currentScrollLeft + input.pointerX - input.gutter);
+  const timeAtPointer = Math.max(0, Math.min(input.duration, timelineX / currentPps));
+  return Math.max(0, input.gutter + timeAtPointer * nextPps - input.pointerX);
 }
 
 export function getTimelinePlayheadLeft(time: number, pixelsPerSecond: number): number {
@@ -306,6 +331,8 @@ export const Timeline = memo(function Timeline({
   const currentTime = usePlayerStore((s) => s.currentTime);
   const zoomMode = usePlayerStore((s) => s.zoomMode);
   const manualZoomPercent = usePlayerStore((s) => s.manualZoomPercent);
+  const setZoomMode = usePlayerStore((s) => s.setZoomMode);
+  const setManualZoomPercent = usePlayerStore((s) => s.setManualZoomPercent);
   const playheadRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -435,7 +462,11 @@ export const Timeline = memo(function Timeline({
   const trackContentWidth = Math.max(0, effectiveDuration * pps);
   const zoomModeRef = useRef(zoomMode);
   zoomModeRef.current = zoomMode;
+  const manualZoomPercentRef = useRef(manualZoomPercent);
+  manualZoomPercentRef.current = manualZoomPercent;
   const previousZoomModeRef = useRef<ZoomMode | null>(zoomMode);
+  const fitPpsRef = useRef(fitPps);
+  fitPpsRef.current = fitPps;
 
   const durationRef = useRef(effectiveDuration);
   durationRef.current = effectiveDuration;
@@ -1011,6 +1042,48 @@ export const Timeline = memo(function Timeline({
     [onAssetDrop, onFileDrop],
   );
 
+  const handleWheel = useCallback(
+    (e: React.WheelEvent<HTMLDivElement>) => {
+      if (!e.ctrlKey) return;
+      const scroll = scrollRef.current;
+      if (!scroll || durationRef.current <= 0 || fitPpsRef.current <= 0 || ppsRef.current <= 0) {
+        return;
+      }
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const rect = scroll.getBoundingClientRect();
+      const pointerX = e.clientX - rect.left;
+      const nextZoomPercent = getPinchTimelineZoomPercent(
+        e.deltaY,
+        zoomModeRef.current,
+        manualZoomPercentRef.current,
+      );
+      if (nextZoomPercent === manualZoomPercentRef.current && zoomModeRef.current === "manual") {
+        return;
+      }
+
+      const nextPps = fitPpsRef.current * (nextZoomPercent / 100);
+      const nextScrollLeft = getTimelineScrollLeftForZoomAnchor({
+        pointerX,
+        currentScrollLeft: scroll.scrollLeft,
+        gutter: GUTTER,
+        currentPixelsPerSecond: ppsRef.current,
+        nextPixelsPerSecond: nextPps,
+        duration: durationRef.current,
+      });
+
+      setZoomMode("manual");
+      setManualZoomPercent(nextZoomPercent);
+      requestAnimationFrame(() => {
+        const maxScrollLeft = Math.max(0, scroll.scrollWidth - scroll.clientWidth);
+        scroll.scrollLeft = Math.min(maxScrollLeft, nextScrollLeft);
+      });
+    },
+    [setManualZoomPercent, setZoomMode],
+  );
+
   if (!timelineReady || elements.length === 0) {
     return (
       <div
@@ -1186,6 +1259,7 @@ export const Timeline = memo(function Timeline({
         onDragOver={handleAssetDragOver}
         onDragLeave={() => setIsDragOver(false)}
         onDrop={handleAssetDrop}
+        onWheel={handleWheel}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
