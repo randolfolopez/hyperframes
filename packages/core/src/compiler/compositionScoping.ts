@@ -152,7 +152,7 @@ export function wrapScopedCompositionScript(
               return found && __hfContains(found) ? found : null;
             };
           }
-          var value = Reflect.get(target, prop, receiver);
+          var value = Reflect.get(target, prop, target);
           return typeof value === "function" ? value.bind(target) : value;
         },
       })
@@ -166,10 +166,10 @@ export function wrapScopedCompositionScript(
     if (!__hfTimelineRegistryProxy) {
       __hfTimelineRegistryProxy = new Proxy(window.__timelines, {
         get: function(target, prop, receiver) {
-          return Reflect.get(target, prop === __hfCompId ? __hfTimelineCompId : prop, receiver);
+          return Reflect.get(target, prop === __hfCompId ? __hfTimelineCompId : prop, target);
         },
         set: function(target, prop, value, receiver) {
-          return Reflect.set(target, prop === __hfCompId ? __hfTimelineCompId : prop, value, receiver);
+          return Reflect.set(target, prop === __hfCompId ? __hfTimelineCompId : prop, value, target);
         },
       });
     }
@@ -179,7 +179,7 @@ export function wrapScopedCompositionScript(
     ? new Proxy(window, {
         get: function(target, prop, receiver) {
           if (prop === "__timelines") return __hfGetTimelineRegistry();
-          var value = Reflect.get(target, prop, receiver);
+          var value = Reflect.get(target, prop, target);
           return typeof value === "function" ? value.bind(target) : value;
         },
         set: function(target, prop, value, receiver) {
@@ -188,7 +188,7 @@ export function wrapScopedCompositionScript(
             __hfTimelineRegistryProxy = null;
             return true;
           }
-          return Reflect.set(target, prop, value, receiver);
+          return Reflect.set(target, prop, value, target);
         },
       })
     : window;
@@ -252,12 +252,12 @@ export function wrapScopedCompositionScript(
                     };
                   };
                 }
-                var value = Reflect.get(utilsTarget, utilsProp, utilsReceiver);
+                var value = Reflect.get(utilsTarget, utilsProp, utilsTarget);
                 return typeof value === "function" ? value.bind(utilsTarget) : value;
               },
             });
           }
-          var value = Reflect.get(target, prop, receiver);
+          var value = Reflect.get(target, prop, target);
           return typeof value === "function" ? value.bind(target) : value;
         },
       });
